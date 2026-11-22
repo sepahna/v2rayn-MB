@@ -341,16 +341,31 @@ public static class ConfigHandler
     /// <returns>0 if successful</returns>
     public static async Task<int> RemoveServers(Config config, List<ProfileItem> indexes)
     {
+        // Never remove built-in Free profiles, even when a caller passes them directly.
+        var protectedProfiles = indexes
+            .Where(FreeSubscription.IsProtectedProfile)
+            .Select(item => item.IndexId)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var removableProfiles = indexes
+            .Where(item => !FreeSubscription.IsProtectedProfile(item))
+            .ToList();
+
+        if (removableProfiles.Count == 0)
+        {
+            return 0;
+        }
+
         var subid = "TempRemoveSubId";
-        foreach (var item in indexes)
+        foreach (var item in removableProfiles)
         {
             item.Subid = subid;
         }
 
-        await SQLiteHelper.Instance.UpdateAllAsync(indexes);
+        await SQLiteHelper.Instance.UpdateAllAsync(removableProfiles);
         await RemoveServersViaSubid(config, subid, false);
 
-        return 0;
+        return protectedProfiles.Count > 0 ? 1 : 0;
     }
 
     /// <summary>
