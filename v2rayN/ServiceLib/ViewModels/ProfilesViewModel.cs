@@ -567,11 +567,11 @@ public partial class ProfilesViewModel : MyReactiveObject
         }
         var freeProfiles = await AppManager.Instance.ProfileItems(Global.FreeSubscriptionId) ?? [];
         var freeIndexIds = freeProfiles.Select(item => item.IndexId).ToHashSet(StringComparer.Ordinal);
-        var isFreeProfile = (ProfileItem item) =>
-            FreeSubscription.BlocksExport(item.Subid, freeIndexIds.Contains(item.IndexId));
-
-        var protectedCount = lstSelected.Count(isFreeProfile);
-        lstSelected = lstSelected.Where(item => !isFreeProfile(item)).ToList();
+        var protectedCount = lstSelected.Count(item =>
+            FreeSubscription.BlocksExport(item.Subid, freeIndexIds.Contains(item.IndexId)));
+        lstSelected = lstSelected
+            .Where(item => !FreeSubscription.BlocksExport(item.Subid, freeIndexIds.Contains(item.IndexId)))
+            .ToList();
         if (lstSelected.Count == 0)
         {
             NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
