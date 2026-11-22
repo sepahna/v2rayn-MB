@@ -9,6 +9,16 @@ on:
   push:
     branches:
       - master
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'v2rayN/v2rayN/**'
+      - 'v2rayN/ServiceLib/**'
+      - 'v2rayN/Directory.Build.*'
+      - 'v2rayN/Directory.Packages.props'
+      - '.github/workflows/build-windows.yml'
+      - '.github/workflows/build.yml'
 
 permissions:
   contents: write
