@@ -72,7 +72,7 @@ public sealed class AppManager
         catch { }
     }
 
-    public bool InitApp()
+    public async Task<bool> InitAppAsync()
     {
         StartupDiagnostic("STEP 1: WRITE-PERMISSION CHECK BEGIN");
         if (Utils.HasWritePermission() == false)
@@ -120,8 +120,29 @@ public sealed class AppManager
         StartupDiagnostic("STEP 6: FREE SUBSCRIPTION INITIALIZATION BEGIN");
         try
         {
-            FreeSubscription.EnsureAsync().GetAwaiter().GetResult();
-            StartupDiagnostic("STEP 6: FREE SUBSCRIPTION INITIALIZATION COMPLETE");
+            var freeSubscriptionTask = FreeSubscription.EnsureAsync();
+            var completed = await Task.WhenAny(freeSubscriptionTask, Task.Delay(TimeSpan.FromSeconds(5)));
+            if (completed == freeSubscriptionTask)
+            {
+                await freeSubscriptionTask;
+                StartupDiagnostic("STEP 6: FREE SUBSCRIPTION INITIALIZATION COMPLETE");
+            }
+            else
+            {
+                StartupDiagnostic("STEP 6: FREE SUBSCRIPTION TIMEOUT AFTER 5 SECONDS; CONTINUING STARTUP");
+                _ = freeSubscriptionTask.ContinueWith(task =>
+                {
+                    if (task.IsFaulted)
+                    {
+                        StartupDiagnostic("FREE SUBSCRIPTION BACKGROUND EXCEPTION: " + task.Exception);
+                        Logging.SaveLog("EnsureFreeSubscription", task.Exception);
+                    }
+                    else
+                    {
+                        StartupDiagnostic("FREE SUBSCRIPTION BACKGROUND COMPLETED AFTER TIMEOUT");
+                    }
+                }, TaskScheduler.Default);
+            }
         }
         catch (Exception ex)
         {
