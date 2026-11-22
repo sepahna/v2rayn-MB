@@ -513,6 +513,17 @@ public partial class ProfilesViewModel : MyReactiveObject
         return freeProfiles.Any(profile => profile.IndexId == item.IndexId);
     }
 
+    private static async Task<bool> IsFreeProfileAsync(ProfileItem item)
+    {
+        if (FreeSubscription.IsProtectedProfile(item))
+        {
+            return true;
+        }
+
+        var freeProfiles = await AppManager.Instance.ProfileItems(Global.FreeSubscriptionId) ?? [];
+        return freeProfiles.Any(profile => profile.IndexId == item.IndexId);
+    }
+
     public async Task EditServerAsync()
     {
         if (string.IsNullOrEmpty(SelectedProfile?.IndexId))
