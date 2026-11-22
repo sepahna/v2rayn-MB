@@ -514,7 +514,7 @@ public partial class ProfilesViewModel : MyReactiveObject
             NoticeManager.Instance.Enqueue(ResUI.PleaseSelectServer);
             return;
         }
-        if (FreeSubscription.IsProtectedProfile(item))
+        if (isFreeProfile(item))
         {
             NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
             return;
@@ -554,8 +554,13 @@ public partial class ProfilesViewModel : MyReactiveObject
         {
             return;
         }
-        var protectedCount = lstSelected.Count(FreeSubscription.IsProtectedProfile);
-        lstSelected = lstSelected.Where(item => !FreeSubscription.IsProtectedProfile(item)).ToList();
+        var freeProfiles = await AppManager.Instance.ProfileItems(Global.FreeSubscriptionId) ?? [];
+        var freeIndexIds = freeProfiles.Select(item => item.IndexId).ToHashSet(StringComparer.Ordinal);
+        var isFreeProfile = (ProfileItem item) =>
+            FreeSubscription.BlocksExport(item.Subid, freeIndexIds.Contains(item.IndexId));
+
+        var protectedCount = lstSelected.Count(isFreeProfile);
+        lstSelected = lstSelected.Where(item => !isFreeProfile(item)).ToList();
         if (lstSelected.Count == 0)
         {
             NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
@@ -905,7 +910,7 @@ public partial class ProfilesViewModel : MyReactiveObject
             return;
         }
 
-        lstSelected = lstSelected.Where(item => !FreeSubscription.IsProtectedProfile(item)).ToList();
+        lstSelected = lstSelected.Where(item => !isFreeProfile(item)).ToList();
         if (lstSelected.Count == 0)
         {
             NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
