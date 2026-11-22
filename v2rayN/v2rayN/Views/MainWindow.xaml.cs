@@ -95,21 +95,11 @@ public partial class MainWindow
                 .Subscribe(UpdateLayout)
                 .DisposeWith(disposables);
 
+            // TEST ISOLATION: HomeLine disabled to isolate startup regression.
+            // Keep status-bar binding active; do not create or bind the HomeLine view.
             this.WhenAnyValue(v => v.ViewModel.StatusBarViewModel)
                 .ObserveOn(RxSchedulers.MainThreadScheduler)
-                .Subscribe(vm =>
-                {
-                    ViewHost.Show(contentStatusBarView, vm);
-                    if (vm != null && contentHomeLine.Content is not HomeLineView)
-                    {
-                        contentHomeLine.Content = new HomeLineView();
-                    }
-
-                    if (contentHomeLine.Content is HomeLineView home)
-                    {
-                        home.ViewModel = vm;
-                    }
-                })
+                .Subscribe(vm => ViewHost.Show(contentStatusBarView, vm))
                 .DisposeWith(disposables);
 
             ViewModel.ReadTextFromClipboardInteraction.RegisterHandler(interaction =>

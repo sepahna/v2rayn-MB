@@ -33,7 +33,7 @@ public partial class App
     /// Open only one process
     /// </summary>
     /// <param name="e"></param>
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         StartupDiagnostic("ONSTARTUP ENTER");
         try
@@ -52,7 +52,7 @@ public partial class App
         }
 
         StartupDiagnostic("INIT APP BEGIN");
-        if (!AppManager.Instance.InitApp())
+        if (!await AppManager.Instance.InitAppAsync())
         {
             StartupDiagnostic("INIT APP FAILED");
             UI.Show($"Loading GUI configuration file is abnormal,please restart the application{Environment.NewLine}加载GUI配置文件异常,请重启应用");
