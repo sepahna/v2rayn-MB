@@ -10,6 +10,17 @@ public static class FreeSubscription
     public static bool IsFree(string? id) =>
         string.Equals(id, Global.FreeSubscriptionId, StringComparison.Ordinal);
 
+    /// <summary>
+    /// A profile is protected when it belongs to the built-in Free subscription or is present
+    /// in that group's list. The membership check also covers profiles whose legacy Subid
+    /// metadata is missing or was changed outside the normal import path.
+    /// </summary>
+    public static bool BlocksExport(string? subscriptionId, bool listedInFreeGroup = false) =>
+        IsFree(subscriptionId) || listedInFreeGroup;
+
+    public static bool IsProtectedProfile(ProfileItem item) =>
+        item is not null && BlocksExport(item.Subid);
+
     public static void Pin(SubItem item)
     {
         item.Id = Global.FreeSubscriptionId;
