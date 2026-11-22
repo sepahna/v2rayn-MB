@@ -117,6 +117,35 @@ jobs:
       working-directory: ./v2rayN
       run: dotnet publish $Project -c Release -r $RID -p:SelfContained=true $ExtOpt -o ${{ env.OUTPUT }}
 
+    - name: Smoke-test WPF main window startup
+      if: inputs.target == 'windows' && inputs.project == './v2rayN/v2rayN.csproj' && matrix.arch == 'x64'
+      shell: pwsh
+      run: |
+        $exe = Join-Path "$env:OUTPUT" "v2rayN.exe"
+        $process = Start-Process -FilePath $exe -PassThru
+        $deadline = (Get-Date).AddSeconds(30)
+        $windowHandle = [IntPtr]::Zero
+        while ((Get-Date) -lt $deadline) {
+          try {
+            $p = Get-Process -Id $process.Id -ErrorAction Stop
+            $p.Refresh()
+            if ($p.MainWindowHandle -ne [IntPtr]::Zero) {
+              $windowHandle = $p.MainWindowHandle
+              break
+            }
+          } catch {
+            break
+          }
+          Start-Sleep -Seconds 1
+        }
+        if ($windowHandle -eq [IntPtr]::Zero) {
+          Get-Process -Id $process.Id -ErrorAction SilentlyContinue | Format-List Id,ProcessName,Responding,MainWindowTitle,MainWindowHandle
+          Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+          throw "v2rayN failed to create a main window within 30 seconds."
+        }
+        Write-Host "WPF startup smoke passed. MainWindowHandle=$windowHandle"
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+
     - name: Build v2rayN Avalonia
       shell: bash
       if: inputs.project == './v2rayN.Desktop/v2rayN.Desktop.csproj'
