@@ -15,8 +15,11 @@ public class HomeLineFormatTests
     [Test]
     public async Task CountryName_UsesTheCurrentLanguage()
     {
-        var previous = CultureInfo.CurrentUICulture;
-        CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en-US");
+        var previousUiCulture = CultureInfo.CurrentUICulture;
+        var previousCulture = CultureInfo.CurrentCulture;
+        var english = CultureInfo.GetCultureInfo("en-US");
+        CultureInfo.CurrentUICulture = english;
+        CultureInfo.CurrentCulture = english;
         try
         {
             await HomeLineFormat.CountryName("DE").Should().BeEqualTo("Germany");
@@ -25,7 +28,8 @@ public class HomeLineFormatTests
         }
         finally
         {
-            CultureInfo.CurrentUICulture = previous;
+            CultureInfo.CurrentUICulture = previousUiCulture;
+            CultureInfo.CurrentCulture = previousCulture;
         }
     }
 }
