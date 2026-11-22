@@ -96,16 +96,18 @@ public partial class MainWindow
                 .DisposeWith(disposables);
 
             this.WhenAnyValue(v => v.ViewModel.StatusBarViewModel)
+                .ObserveOn(RxSchedulers.MainThreadScheduler)
                 .Subscribe(vm =>
                 {
                     ViewHost.Show(contentStatusBarView, vm);
+                    if (vm != null && contentHomeLine.Content is not HomeLineView)
+                    {
+                        contentHomeLine.Content = new HomeLineView();
+                    }
+
                     if (contentHomeLine.Content is HomeLineView home)
                     {
                         home.ViewModel = vm;
-                    }
-                    else if (vm != null)
-                    {
-                        contentHomeLine.Content = new HomeLineView { ViewModel = vm };
                     }
                 })
                 .DisposeWith(disposables);
