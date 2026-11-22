@@ -341,14 +341,13 @@ public static class ConfigHandler
     /// <returns>0 if successful</returns>
     public static async Task<int> RemoveServers(Config config, List<ProfileItem> indexes)
     {
-        // Never remove built-in Free profiles, even when a caller passes them directly.
-        var protectedProfiles = indexes
-            .Where(FreeSubscription.IsProtectedProfile)
-            .Select(item => item.IndexId)
-            .ToHashSet(StringComparer.Ordinal);
+        // Resolve group membership from storage as well as the profile's Subid.
+        // Older/imported profiles may not carry correct subscription metadata.
+        var freeProfiles = await AppManager.Instance.ProfileItems(Global.FreeSubscriptionId) ?? [];
+        var freeIndexIds = freeProfiles.Select(item => item.IndexId).ToHashSet(StringComparer.Ordinal);
 
         var removableProfiles = indexes
-            .Where(item => !FreeSubscription.IsProtectedProfile(item))
+            .Where(item => !FreeSubscription.BlocksExport(item.Subid, freeIndexIds.Contains(item.IndexId)))
             .ToList();
 
         if (removableProfiles.Count == 0)
@@ -365,9 +364,8 @@ public static class ConfigHandler
         await SQLiteHelper.Instance.UpdateAllAsync(removableProfiles);
         await RemoveServersViaSubid(config, subid, false);
 
-        return protectedProfiles.Count > 0 ? 1 : 0;
+        return 0;
     }
-
     /// <summary>
     /// Clone server profiles
     /// Creates copies of the specified server profiles with "-clone" appended to the remarks
