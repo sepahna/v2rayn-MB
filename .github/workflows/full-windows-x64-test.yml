@@ -1,0 +1,60 @@
+name: Full Windows x64 Test Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      target: windows
+      project: './v2rayN/v2rayN.csproj'
+
+  package-full-x64:
+    runs-on: windows-latest
+    needs: build
+    steps:
+      - name: Download x64 app build
+        uses: actions/download-artifact@v8
+        with:
+          name: x64
+          path: package
+
+      - name: Download official Windows x64 Core package
+        shell: pwsh
+        run: |
+          $url = "https://github.com/2dust/v2rayN-core-bin/raw/refs/heads/master/v2rayN-windows-64.zip"
+          Invoke-WebRequest -Uri $url -OutFile core.zip
+          Expand-Archive -Path core.zip -DestinationPath core -Force
+
+      - name: Merge Core files into app folder
+        shell: pwsh
+        run: |
+          Copy-Item -Path "core\*" -Destination "package" -Recurse -Force
+          if (-not (Test-Path "package\v2rayN.exe")) {
+            throw "v2rayN.exe missing from build output."
+          }
+          if (-not (Get-ChildItem "package" -Recurse -File | Where-Object { $_.Name -match '^(xray|sing-box)(\.exe)?$' })) {
+            Write-Warning "Could not find Xray or sing-box executable in merged package. Inspect core archive structure."
+          }
+          Get-ChildItem package -Recurse
+
+      - name: Create full test ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "package\*" -DestinationPath "v2rayN-MB-Windows-x64-Full-Test.zip" -CompressionLevel Optimal
+
+      - name: Upload complete test package
+        uses: actions/upload-artifact@v7
+        with:
+          name: v2rayN-MB-Windows-x64-Full-Test
+          path: v2rayN-MB-Windows-x64-Full-Test.zip
+          if-no-files-found: error
+          retention-days: 30
