@@ -11,6 +11,25 @@ public class FreeSubscriptionTests
     }
 
     [Test]
+    public async Task BlocksExport_ProtectsFreeSubscriptionAndListedProfiles()
+    {
+        await FreeSubscription.BlocksExport(Global.FreeSubscriptionId).Should().BeTrue();
+        await FreeSubscription.BlocksExport("ordinary-subscription").Should().BeFalse();
+        await FreeSubscription.BlocksExport("ordinary-subscription", listedInFreeGroup: true).Should().BeTrue();
+        await FreeSubscription.BlocksExport(null).Should().BeFalse();
+    }
+
+    [Test]
+    public async Task IsProtectedProfile_UsesFreeSubscriptionId()
+    {
+        var freeProfile = new ProfileItem { Subid = Global.FreeSubscriptionId };
+        var normalProfile = new ProfileItem { Subid = "ordinary-subscription" };
+
+        await FreeSubscription.IsProtectedProfile(freeProfile).Should().BeTrue();
+        await FreeSubscription.IsProtectedProfile(normalProfile).Should().BeFalse();
+    }
+
+    [Test]
     public async Task Pin_LocksRemarksAndUrl()
     {
         var item = new SubItem

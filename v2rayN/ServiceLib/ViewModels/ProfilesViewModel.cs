@@ -105,7 +105,9 @@ public partial class ProfilesViewModel : MyReactiveObject
 
         var canEditRemove = this.WhenAnyValue(
            x => x.SelectedProfile,
-           selectedSource => selectedSource != null && !selectedSource.IndexId.IsNullOrEmpty());
+           selectedSource => selectedSource != null
+               && !selectedSource.IndexId.IsNullOrEmpty()
+               && !FreeSubscription.IsFree(selectedSource.Subid));
 
         this.WhenAnyValue(x => x.SelectedSub)
             .Where(y => y != null && !y.Remarks.IsNullOrEmpty() && _config.SubIndexId != y.Id)
@@ -500,6 +502,17 @@ public partial class ProfilesViewModel : MyReactiveObject
         return lstSelected;
     }
 
+    private static async Task<bool> IsFreeProfileAsync(ProfileItem item)
+    {
+        if (FreeSubscription.IsProtectedProfile(item))
+        {
+            return true;
+        }
+
+        var freeProfiles = await AppManager.Instance.ProfileItems(Global.FreeSubscriptionId) ?? [];
+        return freeProfiles.Any(profile => profile.IndexId == item.IndexId);
+    }
+
     public async Task EditServerAsync()
     {
         if (string.IsNullOrEmpty(SelectedProfile?.IndexId))
@@ -510,6 +523,11 @@ public partial class ProfilesViewModel : MyReactiveObject
         if (item is null)
         {
             NoticeManager.Instance.Enqueue(ResUI.PleaseSelectServer);
+            return;
+        }
+        if (await IsFreeProfileAsync(item))
+        {
+            NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
             return;
         }
         var eConfigType = item.ConfigType;
@@ -547,6 +565,18 @@ public partial class ProfilesViewModel : MyReactiveObject
         {
             return;
         }
+        var freeProfiles = await AppManager.Instance.ProfileItems(Global.FreeSubscriptionId) ?? [];
+        var freeIndexIds = freeProfiles.Select(item => item.IndexId).ToHashSet(StringComparer.Ordinal);
+        var protectedCount = lstSelected.Count(item =>
+            FreeSubscription.BlocksExport(item.Subid, freeIndexIds.Contains(item.IndexId)));
+        lstSelected = lstSelected
+            .Where(item => !FreeSubscription.BlocksExport(item.Subid, freeIndexIds.Contains(item.IndexId)))
+            .ToList();
+        if (lstSelected.Count == 0)
+        {
+            NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
+            return;
+        }
         if (await ShowYesNoInteraction.HandleSafe(ResUI.RemoveServer) == false)
         {
             return;
@@ -554,7 +584,7 @@ public partial class ProfilesViewModel : MyReactiveObject
         var exists = lstSelected.Exists(t => t.IndexId == _config.IndexId);
 
         await ConfigHandler.RemoveServers(_config, lstSelected);
-        NoticeManager.Instance.Enqueue(ResUI.OperationSuccess);
+        NoticeManager.Instance.Enqueue(protectedCount > 0 ? ResUI.OperationFailed : ResUI.OperationSuccess);
         if (lstSelected.Count == ProfileItems.Count)
         {
             ProfileItems.Clear();
@@ -635,6 +665,11 @@ public partial class ProfilesViewModel : MyReactiveObject
         if (item is null)
         {
             NoticeManager.Instance.Enqueue(ResUI.PleaseSelectServer);
+            return;
+        }
+        if (await IsFreeProfileAsync(item))
+        {
+            NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
             return;
         }
         var url = FmtHandler.GetShareUri(item);
@@ -814,6 +849,11 @@ public partial class ProfilesViewModel : MyReactiveObject
             NoticeManager.Instance.Enqueue(ResUI.PleaseSelectServer);
             return;
         }
+        if (await IsFreeProfileAsync(item))
+        {
+            NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
+            return;
+        }
 
         var (context, validatorResult) = await CoreConfigContextBuilder.Build(_config, item);
         if (NoticeManager.Instance.NotifyValidatorResult(validatorResult) && !validatorResult.Success)
@@ -846,6 +886,11 @@ public partial class ProfilesViewModel : MyReactiveObject
         {
             return;
         }
+        if (await IsFreeProfileAsync(item))
+        {
+            NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
+            return;
+        }
         var (context, validatorResult) = await CoreConfigContextBuilder.Build(_config, item);
         if (NoticeManager.Instance.NotifyValidatorResult(validatorResult) && !validatorResult.Success)
         {
@@ -867,6 +912,17 @@ public partial class ProfilesViewModel : MyReactiveObject
         var lstSelected = await GetProfileItems(true);
         if (lstSelected == null)
         {
+            return;
+        }
+
+        var freeProfiles = await AppManager.Instance.ProfileItems(Global.FreeSubscriptionId) ?? [];
+        var freeIndexIds = freeProfiles.Select(item => item.IndexId).ToHashSet(StringComparer.Ordinal);
+        lstSelected = lstSelected
+            .Where(item => !FreeSubscription.BlocksExport(item.Subid, freeIndexIds.Contains(item.IndexId)))
+            .ToList();
+        if (lstSelected.Count == 0)
+        {
+            NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
             return;
         }
 
@@ -900,6 +956,17 @@ public partial class ProfilesViewModel : MyReactiveObject
         var lstSelected = await GetProfileItems(true);
         if (lstSelected == null)
         {
+            return;
+        }
+
+        var freeProfiles = await AppManager.Instance.ProfileItems(Global.FreeSubscriptionId) ?? [];
+        var freeIndexIds = freeProfiles.Select(item => item.IndexId).ToHashSet(StringComparer.Ordinal);
+        lstSelected = lstSelected
+            .Where(item => !FreeSubscription.BlocksExport(item.Subid, freeIndexIds.Contains(item.IndexId)))
+            .ToList();
+        if (lstSelected.Count == 0)
+        {
+            NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
             return;
         }
 
@@ -937,7 +1004,7 @@ public partial class ProfilesViewModel : MyReactiveObject
         else
         {
             item = await AppManager.Instance.GetSubItem(_config.SubIndexId);
-            if (item is null)
+            if (item is null || FreeSubscription.IsFree(item.Id))
             {
                 return;
             }
@@ -957,7 +1024,7 @@ public partial class ProfilesViewModel : MyReactiveObject
     private async Task DeleteSubAsync()
     {
         var item = await AppManager.Instance.GetSubItem(_config.SubIndexId);
-        if (item is null)
+        if (item is null || FreeSubscription.IsFree(item.Id))
         {
             return;
         }
