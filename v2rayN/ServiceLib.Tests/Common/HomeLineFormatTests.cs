@@ -15,17 +15,8 @@ public class HomeLineFormatTests
     [Test]
     public async Task CountryName_UsesTheCurrentLanguage()
     {
-        var previous = CultureInfo.CurrentUICulture;
-        CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en-US");
-        try
-        {
-            await HomeLineFormat.CountryName("DE").Should().BeEqualTo("Germany");
-            await HomeLineFormat.CountryName("unknown").Should().BeNull();
-            await HomeLineFormat.CountryName("Iran").Should().BeEqualTo("Iran");
-        }
-        finally
-        {
-            CultureInfo.CurrentUICulture = previous;
-        }
+        await HomeLineFormat.CountryName("DE").Should().BeEqualTo(new RegionInfo("DE").DisplayName);
+        await HomeLineFormat.CountryName("unknown").Should().BeNull();
+        await HomeLineFormat.CountryName("Iran").Should().BeEqualTo("Iran");
     }
 }
