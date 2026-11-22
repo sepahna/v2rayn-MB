@@ -839,6 +839,12 @@ public partial class ProfilesViewModel : MyReactiveObject
             return;
         }
 
+        if (FreeSubscription.IsProtectedProfile(item))
+        {
+            NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
+            return;
+        }
+
         var (context, validatorResult) = await CoreConfigContextBuilder.Build(_config, item);
         if (NoticeManager.Instance.NotifyValidatorResult(validatorResult) && !validatorResult.Success)
         {
@@ -870,6 +876,11 @@ public partial class ProfilesViewModel : MyReactiveObject
         {
             return;
         }
+        if (FreeSubscription.IsProtectedProfile(item))
+        {
+            NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
+            return;
+        }
         var (context, validatorResult) = await CoreConfigContextBuilder.Build(_config, item);
         if (NoticeManager.Instance.NotifyValidatorResult(validatorResult) && !validatorResult.Success)
         {
@@ -894,8 +905,14 @@ public partial class ProfilesViewModel : MyReactiveObject
             return;
         }
 
-        StringBuilder sb = new();
         lstSelected = lstSelected.Where(item => !FreeSubscription.IsProtectedProfile(item)).ToList();
+        if (lstSelected.Count == 0)
+        {
+            NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
+            return;
+        }
+
+        StringBuilder sb = new();
         foreach (var it in lstSelected)
         {
             var url = FmtHandler.GetShareUri(it);
