@@ -21,8 +21,11 @@ public class StatisticsManager
         _updateFunc = updateFunc;
         await InitData();
 
-        _statisticsXray = new StatisticsXrayService(config, UpdateServerStatHandler);
-        _statisticsSingbox = new StatisticsSingboxService(config, UpdateServerStatHandler);
+        if (config.GuiItem.EnableStatistics || config.GuiItem.DisplayRealTimeSpeed || updateFunc != null)
+        {
+            _statisticsXray = new StatisticsXrayService(config, UpdateServerStatHandler);
+            _statisticsSingbox = new StatisticsSingboxService(config, UpdateServerStatHandler);
+        }
     }
 
     public void Close()
