@@ -22,7 +22,7 @@ jobs:
     needs: build
     steps:
       - name: Download x64 app build
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: x64
           path: package
@@ -52,7 +52,7 @@ jobs:
           Compress-Archive -Path "package\*" -DestinationPath "v2rayN-MB-Windows-x64-Full-Test.zip" -CompressionLevel Optimal
 
       - name: Upload complete test package
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: v2rayN-MB-Windows-x64-Full-Test
           path: v2rayN-MB-Windows-x64-Full-Test.zip
