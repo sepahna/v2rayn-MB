@@ -502,6 +502,17 @@ public partial class ProfilesViewModel : MyReactiveObject
         return lstSelected;
     }
 
+    private async Task<bool> IsFreeProfileAsync(ProfileItem item)
+    {
+        if (FreeSubscription.IsProtectedProfile(item))
+        {
+            return true;
+        }
+
+        var freeProfiles = await AppManager.Instance.ProfileItems(Global.FreeSubscriptionId) ?? [];
+        return freeProfiles.Any(profile => profile.IndexId == item.IndexId);
+    }
+
     public async Task EditServerAsync()
     {
         if (string.IsNullOrEmpty(SelectedProfile?.IndexId))
@@ -514,7 +525,7 @@ public partial class ProfilesViewModel : MyReactiveObject
             NoticeManager.Instance.Enqueue(ResUI.PleaseSelectServer);
             return;
         }
-        if (isFreeProfile(item))
+        if (await IsFreeProfileAsync(item))
         {
             NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
             return;
@@ -656,7 +667,7 @@ public partial class ProfilesViewModel : MyReactiveObject
             NoticeManager.Instance.Enqueue(ResUI.PleaseSelectServer);
             return;
         }
-        if (FreeSubscription.IsProtectedProfile(item))
+        if (await IsFreeProfileAsync(item))
         {
             NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
             return;
@@ -844,7 +855,7 @@ public partial class ProfilesViewModel : MyReactiveObject
             return;
         }
 
-        if (FreeSubscription.IsProtectedProfile(item))
+        if (await IsFreeProfileAsync(item))
         {
             NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
             return;
@@ -881,7 +892,7 @@ public partial class ProfilesViewModel : MyReactiveObject
         {
             return;
         }
-        if (FreeSubscription.IsProtectedProfile(item))
+        if (await IsFreeProfileAsync(item))
         {
             NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
             return;
@@ -950,7 +961,11 @@ public partial class ProfilesViewModel : MyReactiveObject
             return;
         }
 
-        lstSelected = lstSelected.Where(item => !FreeSubscription.IsProtectedProfile(item)).ToList();
+        var freeProfiles = await AppManager.Instance.ProfileItems(Global.FreeSubscriptionId) ?? [];
+        var freeIndexIds = freeProfiles.Select(item => item.IndexId).ToHashSet(StringComparer.Ordinal);
+        lstSelected = lstSelected
+            .Where(item => !FreeSubscription.BlocksExport(item.Subid, freeIndexIds.Contains(item.IndexId)))
+            .ToList();
         if (lstSelected.Count == 0)
         {
             NoticeManager.Instance.Enqueue(ResUI.OperationFailed);
