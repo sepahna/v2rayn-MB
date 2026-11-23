@@ -64,9 +64,23 @@ public static class FreeSubscription
         }
     }
 
+    private static void StartupDiagnostic(string message)
+    {
+        try
+        {
+            var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "v2rayN-MB", "startup-diagnostic.log");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.AppendAllText(path, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] FREE SUBSCRIPTION: {message}{Environment.NewLine}");
+        }
+        catch { }
+    }
+
     public static async Task EnsureAsync()
     {
+        StartupDiagnostic("ENSURE BEGIN");
+        StartupDiagnostic("GET FREE SUBITEM BEGIN");
         var existing = await AppManager.Instance.GetSubItem(Global.FreeSubscriptionId);
+        StartupDiagnostic("GET FREE SUBITEM COMPLETE: " + (existing is null ? "NULL" : "FOUND"));
         if (existing is null)
         {
             var item = new SubItem
@@ -77,20 +91,28 @@ public static class FreeSubscription
             Pin(item);
 
             // Push other groups down so Free stays first.
+            StartupDiagnostic("GET OTHER SUBITEMS BEGIN");
             var others = await AppManager.Instance.SubItems() ?? [];
+            StartupDiagnostic("GET OTHER SUBITEMS COMPLETE: " + others.Count);
             foreach (var other in others.Where(t => !IsFree(t.Id)))
             {
                 if (other.Sort < 2)
                 {
                     other.Sort += 1;
+                    StartupDiagnostic("REPLACE OTHER SUBITEM BEGIN: " + other.Id);
                     await SQLiteHelper.Instance.ReplaceAsync(other);
+                    StartupDiagnostic("REPLACE OTHER SUBITEM COMPLETE: " + other.Id);
                 }
             }
 
+            StartupDiagnostic("REPLACE NEW FREE SUBITEM BEGIN");
             await SQLiteHelper.Instance.ReplaceAsync(item);
+            StartupDiagnostic("REPLACE NEW FREE SUBITEM COMPLETE");
+            StartupDiagnostic("ENSURE COMPLETE (NEW ITEM)");
             return;
         }
 
+        StartupDiagnostic("PIN EXISTING FREE SUBITEM BEGIN");
         var beforeRemarks = existing.Remarks;
         var beforeUrl = existing.Url;
         var beforeEnabled = existing.Enabled;
@@ -103,7 +125,10 @@ public static class FreeSubscription
             || existing.Sort != 1)
         {
             existing.Sort = 1;
+            StartupDiagnostic("REPLACE EXISTING FREE SUBITEM BEGIN");
             await SQLiteHelper.Instance.ReplaceAsync(existing);
+            StartupDiagnostic("REPLACE EXISTING FREE SUBITEM COMPLETE");
         }
+        StartupDiagnostic("ENSURE COMPLETE (EXISTING ITEM)");
     }
 }

@@ -60,21 +60,42 @@ public sealed class AppManager
 
     #region App
 
-    public bool InitApp()
+    private static readonly string StartupDiagnosticPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "v2rayN-MB", "startup-diagnostic.log");
+
+    private static void StartupDiagnostic(string message)
     {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(StartupDiagnosticPath)!);
+            File.AppendAllText(StartupDiagnosticPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] INITAPP: {message}{Environment.NewLine}");
+        }
+        catch { }
+    }
+
+    public async Task<bool> InitAppAsync()
+    {
+        StartupDiagnostic("STEP 1: WRITE-PERMISSION CHECK BEGIN");
         if (Utils.HasWritePermission() == false)
         {
             Environment.SetEnvironmentVariable(Global.LocalAppData, "1", EnvironmentVariableTarget.Process);
         }
 
+        StartupDiagnostic("STEP 1: WRITE-PERMISSION CHECK COMPLETE");
+        StartupDiagnostic("STEP 2: LOGGING SETUP BEGIN");
         Logging.Setup();
+        StartupDiagnostic("STEP 2: LOGGING SETUP COMPLETE");
+        StartupDiagnostic("STEP 3: LOAD CONFIG BEGIN");
         var config = ConfigHandler.LoadConfig();
+        StartupDiagnostic($"STEP 3: LOAD CONFIG RESULT: {(config == null ? "NULL" : "OK")}");
         if (config == null)
         {
             return false;
         }
+        StartupDiagnostic("STEP 4: ASSIGN CONFIG BEGIN");
         _config = config;
+        StartupDiagnostic("STEP 4: CONFIG ASSIGNED; UI CULTURE BEGIN");
         Thread.CurrentThread.CurrentUICulture = new(_config.UiItem.CurrentLanguage);
+        StartupDiagnostic("STEP 4: UI CULTURE SET");
 
         //Under Win10
         if (Utils.IsWindows() && Environment.OSVersion.Version.Major < 10)
@@ -82,26 +103,54 @@ public sealed class AppManager
             Environment.SetEnvironmentVariable("DOTNET_EnableWriteXorExecute", "0", EnvironmentVariableTarget.User);
         }
 
-        SQLiteHelper.Instance.CreateTable<SubItem>();
-        SQLiteHelper.Instance.CreateTable<ProfileItem>();
-        SQLiteHelper.Instance.CreateTable<ServerStatItem>();
-        SQLiteHelper.Instance.CreateTable<RoutingItem>();
-        SQLiteHelper.Instance.CreateTable<ProfileExItem>();
-        SQLiteHelper.Instance.CreateTable<DNSItem>();
-        SQLiteHelper.Instance.CreateTable<FullConfigTemplateItem>();
+        StartupDiagnostic("STEP 5: SQLITE TABLE CREATION BEGIN");
+        SQLiteHelper.Instance.CreateTable<SubItem>(); StartupDiagnostic("SQLITE: SubItem OK");
+        SQLiteHelper.Instance.CreateTable<ProfileItem>(); StartupDiagnostic("SQLITE: ProfileItem OK");
+        SQLiteHelper.Instance.CreateTable<ServerStatItem>(); StartupDiagnostic("SQLITE: ServerStatItem OK");
+        SQLiteHelper.Instance.CreateTable<RoutingItem>(); StartupDiagnostic("SQLITE: RoutingItem OK");
+        SQLiteHelper.Instance.CreateTable<ProfileExItem>(); StartupDiagnostic("SQLITE: ProfileExItem OK");
+        SQLiteHelper.Instance.CreateTable<DNSItem>(); StartupDiagnostic("SQLITE: DNSItem OK");
+        SQLiteHelper.Instance.CreateTable<FullConfigTemplateItem>(); StartupDiagnostic("SQLITE: FullConfigTemplateItem OK");
 #pragma warning disable CS0618
         SQLiteHelper.Instance.CreateTable<ProfileGroupItem>();
+        StartupDiagnostic("SQLITE: ProfileGroupItem OK");
 #pragma warning restore CS0618
+        StartupDiagnostic("STEP 5: SQLITE TABLE CREATION COMPLETE");
 
+        StartupDiagnostic("STEP 6: FREE SUBSCRIPTION INITIALIZATION BEGIN");
         try
         {
-            FreeSubscription.EnsureAsync().GetAwaiter().GetResult();
+            var freeSubscriptionTask = FreeSubscription.EnsureAsync();
+            var completed = await Task.WhenAny(freeSubscriptionTask, Task.Delay(TimeSpan.FromSeconds(5)));
+            if (completed == freeSubscriptionTask)
+            {
+                await freeSubscriptionTask;
+                StartupDiagnostic("STEP 6: FREE SUBSCRIPTION INITIALIZATION COMPLETE");
+            }
+            else
+            {
+                StartupDiagnostic("STEP 6: FREE SUBSCRIPTION TIMEOUT AFTER 5 SECONDS; CONTINUING STARTUP");
+                _ = freeSubscriptionTask.ContinueWith(task =>
+                {
+                    if (task.IsFaulted)
+                    {
+                        StartupDiagnostic("FREE SUBSCRIPTION BACKGROUND EXCEPTION: " + task.Exception);
+                        Logging.SaveLog("EnsureFreeSubscription", task.Exception);
+                    }
+                    else
+                    {
+                        StartupDiagnostic("FREE SUBSCRIPTION BACKGROUND COMPLETED AFTER TIMEOUT");
+                    }
+                }, TaskScheduler.Default);
+            }
         }
         catch (Exception ex)
         {
+            StartupDiagnostic("STEP 6: FREE SUBSCRIPTION EXCEPTION: " + ex);
             Logging.SaveLog("EnsureFreeSubscription", ex);
         }
 
+        StartupDiagnostic("INITAPP FINISHED SUCCESSFULLY");
         return true;
     }
 
