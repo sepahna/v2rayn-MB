@@ -1,5 +1,6 @@
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MaterialDesignThemes.Wpf;
 using v2rayN.Base;
 using v2rayN.Manager;
@@ -11,11 +12,54 @@ public partial class MainWindow
     private static Config _config;
     private readonly SingleReplaceableDisposable _layoutBindingsDisposable = new();
     private CheckUpdateView? _checkUpdateView;
+    private bool _startupRecoveryCompleted;
+
+    private static void StartupWindowDiagnostic(string message)
+    {
+        try
+        {
+            var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "v2rayN-MB", "startup-diagnostic.log");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.AppendAllText(path, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] WINDOW: {message}{Environment.NewLine}");
+        }
+        catch { }
+    }
+
+    private void RunStartupWindowRecovery()
+    {
+        if (_startupRecoveryCompleted) return;
+        _startupRecoveryCompleted = true;
+
+        StartupWindowDiagnostic($"RECOVERY BEGIN: Visible={IsVisible}, State={WindowState}, Left={Left}, Top={Top}, Width={Width}, Height={Height}");
+
+        try
+        {
+            if (WindowState == WindowState.Minimized)
+                WindowState = WindowState.Normal;
+
+            if (!IsVisible)
+                Show();
+
+            EnsureWindowOnScreen(applySavedSize: false);
+            Activate();
+            Focus();
+
+            StartupWindowDiagnostic($"RECOVERY COMPLETE: Visible={IsVisible}, State={WindowState}, Left={Left}, Top={Top}");
+        }
+        catch (Exception ex)
+        {
+            StartupWindowDiagnostic("RECOVERY ERROR: " + ex);
+        }
+    }
     private BackupAndRestoreView? _backupAndRestoreView;
 
     public MainWindow()
     {
         InitializeComponent();
+        StartupWindowDiagnostic("CONSTRUCTOR");
+        Loaded += (_, _) => StartupWindowDiagnostic($"LOADED: Visible={IsVisible}, State={WindowState}, Left={Left}, Top={Top}, Width={Width}, Height={Height}");
+        IsVisibleChanged += (_, _) => StartupWindowDiagnostic($"VISIBILITY CHANGED: Visible={IsVisible}");
+        StateChanged += (_, _) => StartupWindowDiagnostic($"STATE CHANGED: {WindowState}");
 
         _config = AppManager.Instance.Config;
         ThreadPool.RegisterWaitForSingleObject(App.ProgramStarted, OnProgramStarted, null, -1, false);
@@ -155,10 +199,7 @@ public partial class MainWindow
         });
 
         Title = $"{Utils.GetVersion()} - {(Utils.IsAdministrator() ? ResUI.RunAsAdmin : ResUI.NotRunAsAdmin)}";
-        if (_config.UiItem.AutoHideStartup)
-        {
-            WindowState = WindowState.Minimized;
-        }
+        // Startup recovery: force a visible normal window for this diagnostic build.
 
         if (!_config.GuiItem.EnableHWA)
         {
@@ -332,11 +373,17 @@ public partial class MainWindow
     protected override void OnLoaded(object? sender, RoutedEventArgs e)
     {
         base.OnLoaded(sender, e);
-        if (_config.UiItem.AutoHideStartup)
-        {
-            ShowHideWindow(false);
-        }
+        StartupWindowDiagnostic($"ONLOADED: Visible={IsVisible}, State={WindowState}, Left={Left}, Top={Top}");
         RestoreUI();
+
+        // One-shot recovery after WPF has completed initial layout and visibility events.
+        var recoveryTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
+        recoveryTimer.Tick += (_, _) =>
+        {
+            recoveryTimer.Stop();
+            RunStartupWindowRecovery();
+        };
+        recoveryTimer.Start();
     }
 
     private void RestoreUI()
